@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Compute status
     const fieldsWithStatus = fields.map(field => {
       let status = 'ACTIVE'
       if (field.currentStage === 'HARVESTED') {
