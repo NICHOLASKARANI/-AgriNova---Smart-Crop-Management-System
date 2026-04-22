@@ -56,3 +56,33 @@ AgriNova is an AI-powered crop management platform that helps farmers and agricu
 ```bash
 git clone https://github.com/NICHOLASKARANI/agrinova.git
 cd agrinova
+## 🚀 Production Deployment
+
+The app is live at: [https://agrinova-smart-crop.vercel.app](https://your-vercel-url.vercel.app)
+
+### Demo Credentials
+- **Admin**: admin@agrinova.com / admin123
+- **Field Agent**: john@agrinova.com / agent123
+
+### Environment Variables Required
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: JWT signing secret
+- `NEXTAUTH_SECRET`: NextAuth secret
+- `NEXTAUTH_URL`: Production app URL
+
+### Database Setup
+This project uses PostgreSQL. For production, we recommend:
+- Vercel Postgres (easiest)
+- Supabase (free tier available)
+- Railway (free tier available)
+
+### Deployment Commands
+```bash
+# Deploy to Vercel
+vercel --prod
+
+# Run database migrations
+npx prisma db push
+
+# Seed production database
+node scripts/seed-prod.js
