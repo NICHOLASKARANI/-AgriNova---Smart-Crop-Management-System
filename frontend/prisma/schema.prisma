@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          Role      @default(FIELD_AGENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  assignedFields Field[]  @relation("AssignedFields")
+  updates        Update[]
+}
+
+model Field {
+  id            String    @id @default(cuid())
+  name          String
+  cropType      String
+  plantingDate  DateTime
+  currentStage  Stage     @default(PLANTED)
+  location      String?
+  size          Float?
+  agentId       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  agent         User?     @relation("AssignedFields", fields: [agentId], references: [id])
+  updates       Update[]
+}
+
+model Update {
+  id            String    @id @default(cuid())
+  fieldId       String
+  userId        String
+  newStage      Stage
+  notes         String?
+  weatherData   String?
+  healthScore   Int?
+  createdAt     DateTime  @default(now())
+  
+  field         Field     @relation(fields: [fieldId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+model Prediction {
+  id            String    @id @default(cuid())
+  fieldId       String
+  riskLevel     String
+  confidence    Float
+  recommendedAction String?
+  predictedHarvestDate DateTime?
+  createdAt     DateTime  @default(now())
+  
+  field         Field     @relation(fields: [fieldId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  FIELD_AGENT
+}
+
+enum Stage {
+  PLANTED
+  GROWING
+  READY
+  HARVESTED
+}
