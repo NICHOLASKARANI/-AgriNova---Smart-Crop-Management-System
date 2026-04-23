@@ -1,45 +1,57 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import toast from 'react-hot-toast'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    if (searchParams.get('registered') === 'true') {
-      toast.success('Account created successfully! Please login.')
+    if (searchParams && searchParams.get('registered') === 'true') {
+      setSuccess('Account created successfully! Please login.')
     }
-  }, [])
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setIsLoading(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      if (email === 'admin@agrinova.com' && password === 'admin123') {
-        document.cookie = 'session=admin; path=/; max-age=86400'
-        toast.success('Welcome back, Admin!')
-        router.push('/admin')
-      } else if (email === 'john@agrinova.com' && password === 'agent123') {
-        document.cookie = 'session=agent; path=/; max-age=86400'
-        toast.success('Welcome back!')
-        router.push('/agent')
-      } else {
-        setError('Invalid credentials. Use demo accounts below.')
-        toast.error('Login failed')
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, rememberMe }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed')
       }
+
+      setSuccess('Login successful! Redirecting...')
+      setTimeout(() => {
+        if (data.user.role === 'admin') {
+          router.push('/admin')
+        } else {
+          router.push('/agent')
+        }
+      }, 1000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -61,6 +73,12 @@ export default function LoginPage() {
             </div>
           )}
 
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-green-600 text-sm">{success}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
@@ -70,7 +88,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition"
                 required
-                placeholder="admin@agrinova.com"
+                placeholder="you@example.com"
               />
             </div>
             
@@ -88,10 +106,17 @@ export default function LoginPage() {
             
             <div className="flex items-center justify-between">
               <label className="flex items-center">
-                <input type="checkbox" className="w-4 h-4 text-green-600 rounded" />
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 text-green-600 rounded"
+                />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-green-600 hover:underline">Forgot password?</a>
+              <Link href="/forgot-password" className="text-sm text-green-600 hover:underline">
+                Forgot password?
+              </Link>
             </div>
             
             <button
@@ -110,20 +135,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
-            <p className="text-sm font-semibold text-gray-700 mb-3 text-center">Demo Accounts</p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">?? Admin</span>
-                <code className="text-xs bg-white px-2 py-1 rounded">admin@agrinova.com / admin123</code>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">????? Field Agent</span>
-                <code className="text-xs bg-white px-2 py-1 rounded">john@agrinova.com / agent123</code>
-              </div>
-            </div>
-          </div>
-
           <div className="mt-6 text-center">
             <p className="text-gray-600">
               Don't have an account?{' '}
@@ -135,5 +146,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

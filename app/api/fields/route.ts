@@ -1,73 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Sample field data
-const fields = [
-  { 
-    id: '1', 
-    name: 'North Field', 
-    cropType: 'Corn', 
-    currentStage: 'GROWING', 
-    location: 'North Region', 
-    size: 45.5, 
-    status: 'ACTIVE',
-    plantingDate: '2024-03-15'
-  },
-  { 
-    id: '2', 
-    name: 'South Valley', 
-    cropType: 'Wheat', 
-    currentStage: 'READY', 
-    location: 'South Region', 
-    size: 32.0, 
-    status: 'ACTIVE',
-    plantingDate: '2024-02-20'
-  },
-  { 
-    id: '3', 
-    name: 'East Garden', 
-    cropType: 'Tomatoes', 
-    currentStage: 'PLANTED', 
-    location: 'East Region', 
-    size: 12.5, 
-    status: 'ACTIVE',
-    plantingDate: '2024-04-01'
-  },
-  { 
-    id: '4', 
-    name: 'West Field', 
-    cropType: 'Soybeans', 
-    currentStage: 'HARVESTED', 
-    location: 'West Region', 
-    size: 28.0, 
-    status: 'COMPLETED',
-    plantingDate: '2024-01-10'
-  },
-]
+import { storage } from '@/lib/storage'
+import { verifyAccessToken } from '@/lib/authUtils'
 
 export async function GET(request: NextRequest) {
-  const session = request.cookies.get('session')?.value
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+  try {
+    const token = request.cookies.get('accessToken')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const decoded = verifyAccessToken(token)
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    let fields = await storage.getFields()
+    
+    if (decoded.role !== 'admin') {
+      fields = await storage.findFieldsByAgent(decoded.userId)
+    }
+
+    // Calculate status for each field
+    const fieldsWithStatus = fields.map((field: any) => {
+      const daysSincePlanting = Math.floor((Date.now() - new Date(field.plantingDate).getTime()) / (1000 * 60 * 60 * 24))
+      const daysSinceLastUpdate = Math.floor((Date.now() - new Date(field.lastUpdate).getTime()) / (1000 * 60 * 60 * 24))
+      
+      let status = 'ACTIVE'
+      
+      if (field.currentStage === 'HARVESTED') {
+        status = 'COMPLETED'
+      } else if (daysSinceLastUpdate > 14) {
+        status = 'AT_RISK'
+      } else if (field.currentStage === 'PLANTED' && daysSincePlanting > 60) {
+        status = 'AT_RISK'
+      } else if (field.currentStage === 'GROWING' && daysSincePlanting > 90) {
+        status = 'AT_RISK'
+      } else if (field.currentStage === 'READY' && daysSincePlanting > 120) {
+        status = 'AT_RISK'
+      }
+      
+      return { ...field, status, daysSincePlanting, daysSinceLastUpdate }
+    })
+
+    return NextResponse.json(fieldsWithStatus)
+  } catch (error) {
+    console.error('Fields error:', error)
+    return NextResponse.json({ error: 'Failed to fetch fields' }, { status: 500 })
   }
-  return NextResponse.json(fields)
 }
 
 export async function POST(request: NextRequest) {
-  const session = request.cookies.get('session')?.value
-  if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
-  }
-  
   try {
-    const body = await request.json()
-    const newField = {
-      id: String(Date.now()),
-      ...body,
-      status: 'ACTIVE'
+    const token = request.cookies.get('accessToken')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    fields.push(newField)
-    return NextResponse.json(newField)
+
+    const decoded = verifyAccessToken(token)
+    if (!decoded || decoded.role !== 'admin') {
+      return NextResponse.json({ error: 'Only admins can create fields' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { name, cropType, plantingDate, location, size, agentId, agentName } = body
+
+    if (!name || !cropType || !plantingDate || !location || !size || !agentId) {
+      return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
+    }
+
+    const newField = {
+      _id: Date.now().toString(),
+      name,
+      cropType,
+      plantingDate: new Date(plantingDate),
+      location,
+      size: parseFloat(size),
+      agentId,
+      agentName,
+      currentStage: 'PLANTED',
+      notes: [],
+      lastUpdate: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    const created = await storage.addField(newField)
+
+    return NextResponse.json(created, { status: 201 })
   } catch (error) {
-    return NextResponse.json({ message: 'Error creating field' }, { status: 500 })
+    console.error('Create field error:', error)
+    return NextResponse.json({ error: 'Failed to create field' }, { status: 500 })
   }
 }
