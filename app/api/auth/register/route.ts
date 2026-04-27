@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import { connectDB } from '@/lib/mongodb'
-import { User } from '@/lib/models/User'
+
+// Simple in-memory storage that persists across requests
+if (!global._users) {
+  global._users = []
+}
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB()
-    
     const body = await request.json()
     const { name, email, password, confirmPassword } = body
 
@@ -25,24 +25,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = await User.findOne({ email })
+    const existingUser = global._users.find((u: any) => u.email === email)
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // Create user
-    await User.create({
+    // Create user (plain password for simplicity)
+    const newUser = {
       id: Date.now().toString(),
       name,
       email,
-      password: hashedPassword,
+      password,
       role: 'user'
-    })
+    }
 
+    global._users.push(newUser)
     console.log('User registered:', email)
+    console.log('Total users:', global._users.length)
 
     return NextResponse.json({ 
       success: true, 

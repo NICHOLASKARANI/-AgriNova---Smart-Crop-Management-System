@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import { connectDB } from '@/lib/mongodb'
-import { User } from '@/lib/models/User'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'agrinova-secret-key-2026'
+if (!global._users) {
+  global._users = []
+}
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB()
-    
     const body = await request.json()
     const { email, password } = body
 
@@ -20,42 +16,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user
-    const user = await User.findOne({ email })
+    const user = global._users.find((u: any) => u.email === email)
     
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.password)
-    if (!isValid) {
+    // Check password
+    if (user.password !== password) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
-
-    // Update last login
-    user.lastLogin = new Date()
-    await user.save()
-
-    // Generate token
-    const token = jwt.sign(
-      { userId: user._id.toString(), email: user.email, role: user.role }, 
-      JWT_SECRET, 
-      { expiresIn: '7d' }
-    )
 
     console.log('Login successful:', email)
 
     const response = NextResponse.json({
       success: true,
       user: { 
-        id: user._id, 
+        id: user.id, 
         name: user.name, 
         email: user.email, 
         role: user.role 
       }
     })
 
-    response.cookies.set('token', token, { 
+    // Set a simple cookie
+    response.cookies.set('token', user.id, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
