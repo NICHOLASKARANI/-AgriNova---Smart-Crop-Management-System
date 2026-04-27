@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { memoryStore } from '@/lib/memoryStore'
+import { fileStorage } from '@/lib/fileStorage'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,10 +23,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = memoryStore.findUserByEmail(email)
+    const existingUser = fileStorage.findUserByEmail(email.toLowerCase())
     if (existingUser) {
       console.log('? User already exists:', email)
-      return NextResponse.json({ error: 'User already exists' }, { status: 400 })
+      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
     }
 
     // Hash password
@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString()
     }
 
-    memoryStore.addUser(newUser)
+    fileStorage.addUser(newUser)
     console.log('? User registered successfully:', email)
-    console.log('?? Total users:', memoryStore.getAllUsers().length)
+    console.log('?? Total users:', fileStorage.getUsers().length)
 
     return NextResponse.json({ 
       success: true, 
@@ -53,6 +53,6 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('? Registration error:', error)
-    return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Registration failed. Please try again.' }, { status: 500 })
   }
 }
