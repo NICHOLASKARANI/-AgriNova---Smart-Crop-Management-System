@@ -29,12 +29,8 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed')
       }
 
-      // Redirect based on role
-      if (data.user.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/agent')
-      }
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (err: any) {
       setError(err.message)
     } finally {
