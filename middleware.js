@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  const session = request.cookies.get('session')?.value
+export function middleware(request) {
+  const token = request.cookies.get('token')?.value
   const { pathname } = request.nextUrl
 
   // Public paths
@@ -10,8 +9,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Protect dashboard routes
-  if (!session && (pathname.startsWith('/admin') || pathname.startsWith('/agent'))) {
+  // Protect dashboard
+  if (!token && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
