@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { dbOps } from '@/lib/dbOps'
+import { connectDB } from '@/lib/mongodb'
+import { User } from '@/lib/models/User'
 
 export async function POST(request: NextRequest) {
   try {
+    await connectDB()
+    
     const body = await request.json()
-    const { name, email, password, confirmPassword, phone, location } = body
+    const { name, email, password, confirmPassword } = body
 
-    console.log('?? Registration attempt:', { name, email })
+    console.log('Registration attempt:', { name, email })
 
-    // Validation
     if (!name || !email || !password || !confirmPassword) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = dbOps.findUserByEmail(email)
+    const existingUser = await User.findOne({ email })
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
@@ -32,25 +34,15 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create user
-    const newUser = {
+    await User.create({
       id: Date.now().toString(),
       name,
       email,
       password: hashedPassword,
-      role: 'user',
-      phone: phone || '',
-      location: location || ''
-    }
+      role: 'user'
+    })
 
-    dbOps.createUser(newUser)
-    console.log('? User registered:', email)
-
-    // Add welcome notification
-    dbOps.addNotification(
-      Date.now().toString(),
-      newUser.id,
-      'Welcome to AgriNova! Start exploring your dashboard.'
-    )
+    console.log('User registered:', email)
 
     return NextResponse.json({ 
       success: true, 
