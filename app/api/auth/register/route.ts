@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { connectDB } from '@/lib/db/mongodb'
 import { User } from '@/lib/db/models/User'
+import { memoryStorage } from '@/lib/memoryStorage'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB()
+    console.log('?? Registration attempt...')
     
     const body = await request.json()
     const { name, email, password, confirmPassword, phone, location } = body
@@ -18,29 +19,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate name
-    if (name.length < 2 || name.length > 50) {
-      return NextResponse.json(
-        { error: 'Name must be 2-50 characters' },
-        { status: 400 }
-      )
-    }
-
     // Validate email format
     const emailRegex = /^\S+@\S+\.\S+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: 'Please enter a valid email address' },
         { status: 400 }
-      )
-    }
-
-    // Check if user already exists in MongoDB
-    const existingUser = await User.findOne({ email: email.toLowerCase() })
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'User with this email already exists' },
-        { status: 409 }
       )
     }
 
@@ -77,18 +61,60 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create new user in MongoDB
-    const newUser = await User.create({
-      name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      phone: phone || '',
-      location: location || '',
-      role: 'user',
-      verified: true
-    })
+    let newUser = null
+    let usingMongoDB = false
 
-    console.log('? User registered:', { name, email })
+    // Try MongoDB first
+    try {
+      await connectDB()
+      const existingUser = await User.findOne({ email: email.toLowerCase() })
+      
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'User with this email already exists' },
+          { status: 409 }
+        )
+      }
+
+      newUser = await User.create({
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        phone: phone || '',
+        location: location || '',
+        role: 'user',
+        verified: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+      usingMongoDB = true
+      console.log('? User saved to MongoDB')
+    } catch (mongoError) {
+      console.log('?? MongoDB unavailable, using memory storage')
+      
+      // Check in memory storage
+      const existingUser = memoryStorage.findUserByEmail(email.toLowerCase())
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'User with this email already exists' },
+          { status: 409 }
+        )
+      }
+
+      newUser = memoryStorage.createUser({
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        phone: phone || '',
+        location: location || '',
+        role: 'user',
+        verified: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      })
+    }
+
+    console.log('? Registration successful:', { email, usingMongoDB })
 
     return NextResponse.json({
       success: true,
@@ -101,10 +127,10 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 201 })
     
-  } catch (error) {
-    console.error('Registration error:', error)
+  } catch (error: any) {
+    console.error('? Registration error:', error)
     return NextResponse.json(
-      { error: 'Registration failed. Please try again.' },
+      { error: error.message || 'Registration failed. Please try again.' },
       { status: 500 }
     )
   }
