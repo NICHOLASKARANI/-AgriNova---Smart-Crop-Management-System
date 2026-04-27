@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Simple in-memory user store (for demo)
-const users = new Map()
+import { connectDB } from '@/lib/db/mongodb'
+import { User } from '@/lib/db/models/User'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   try {
+    await connectDB()
+    
     const body = await request.json()
     const { name, email, password, confirmPassword, phone, location } = body
 
@@ -33,8 +35,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user already exists
-    if (users.has(email.toLowerCase())) {
+    // Check if user already exists in MongoDB
+    const existingUser = await User.findOne({ email: email.toLowerCase() })
+    if (existingUser) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }
@@ -48,6 +51,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    if (!/[A-Z]/.test(password)) {
+      return NextResponse.json(
+        { error: 'Password must have at least one uppercase letter' },
+        { status: 400 }
+      )
+    }
+    
+    if (!/[0-9]/.test(password)) {
+      return NextResponse.json(
+        { error: 'Password must have at least one number' },
+        { status: 400 }
+      )
+    }
 
     // Check if passwords match
     if (password !== confirmPassword) {
@@ -57,30 +74,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Store user (in production, hash password and save to database)
-    const user = {
-      id: Date.now().toString(),
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Create new user in MongoDB
+    const newUser = await User.create({
       name,
       email: email.toLowerCase(),
-      password, // In production, this should be hashed!
+      password: hashedPassword,
       phone: phone || '',
       location: location || '',
       role: 'user',
-      createdAt: new Date().toISOString()
-    }
-    
-    users.set(email.toLowerCase(), user)
-    
-    console.log('User registered:', { name, email })
+      verified: true
+    })
+
+    console.log('? User registered:', { name, email })
 
     return NextResponse.json({
       success: true,
       message: 'Registration successful! Please login.',
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role
       }
     }, { status: 201 })
     

@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { connectDB } from '@/lib/db/mongodb'
+import { User } from '@/lib/db/models/User'
 import jwt from 'jsonwebtoken'
+import bcrypt from 'bcryptjs'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'agrinova-super-secret-key-2026'
-
-// Simple in-memory user store (for demo)
-const users = new Map()
-
-// Pre-add a demo user
-users.set('demo@agrinova.com', {
-  id: '1',
-  name: 'Demo User',
-  email: 'demo@agrinova.com',
-  password: 'Demo123!',
-  role: 'user'
-})
 
 // Rate limiting
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
 export async function POST(request: NextRequest) {
   try {
+    await connectDB()
+    
     const body = await request.json()
     const { email, password, rememberMe } = body
 
@@ -42,10 +35,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Find user
-    const user = users.get(email.toLowerCase())
+    // Find user in MongoDB
+    const user = await User.findOne({ email: email.toLowerCase() })
     
-    if (!user || user.password !== password) {
+    if (!user) {
       loginAttempts.set(clientIp, {
         count: (attempts?.count || 0) + 1,
         lastAttempt: Date.now()
@@ -56,19 +49,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password)
+    if (!isValidPassword) {
+      loginAttempts.set(clientIp, {
+        count: (attempts?.count || 0) + 1,
+        lastAttempt: Date.now()
+      })
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      )
+    }
+
+    // Update last login
+    user.lastLogin = new Date()
+    await user.save()
+
     // Generate token
-    const tokenPayload = { userId: user.id, email: user.email, role: user.role }
+    const tokenPayload = { userId: user._id.toString(), email: user.email, role: user.role }
     const accessToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' })
 
     // Create response
     const response = NextResponse.json({
       success: true,
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        subscription: 'free'
+        subscription: user.subscription
       }
     })
 
@@ -79,6 +89,8 @@ export async function POST(request: NextRequest) {
       sameSite: 'strict',
       maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7
     })
+
+    console.log('? User logged in:', { email: user.email, role: user.role })
 
     return response
 
