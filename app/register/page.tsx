@@ -1,61 +1,58 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  })
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [loading, setLoading] = useState(false)
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-    setLoading(true)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
 
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      setLoading(false)
-      return
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      setLoading(false);
+      return;
     }
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
-      setLoading(false)
-      return
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      setLoading(false);
+      return;
     }
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, confirmPassword }),
+      });
 
-      const data = await res.json()
+      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Registration failed')
+        throw new Error(data.error || "Registration failed");
       }
 
-      setSuccess('Account created successfully! Redirecting to login...')
-      setTimeout(() => router.push('/login'), 2000)
-    } catch (err: any) {
-      setError(err.message)
+      setSuccess("Account created! Redirecting to login...");
+      setTimeout(() => router.push("/login"), 2000);
+    } catch (err) {
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
@@ -87,8 +84,8 @@ export default function RegisterPage() {
               <input
                 type="text"
                 placeholder="Full Name"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
@@ -98,8 +95,8 @@ export default function RegisterPage() {
               <input
                 type="email"
                 placeholder="Email Address"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
@@ -109,8 +106,8 @@ export default function RegisterPage() {
               <input
                 type="password"
                 placeholder="Password (min 8 characters)"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
@@ -120,8 +117,8 @@ export default function RegisterPage() {
               <input
                 type="password"
                 placeholder="Confirm Password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
@@ -132,13 +129,13 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full py-3 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 text-white font-semibold hover:shadow-lg transition disabled:opacity-50"
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-gray-600">
-              Already have an account?{' '}
+              Already have an account?{" "}
               <Link href="/login" className="text-green-600 font-semibold hover:underline">
                 Sign In
               </Link>
@@ -147,5 +144,5 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
