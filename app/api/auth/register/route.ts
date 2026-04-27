@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Simple in-memory storage that persists across requests
-if (!global._users) {
-  global._users = []
-}
+import bcrypt from 'bcryptjs'
+import { dbOps } from '@/lib/dbOps'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, password, confirmPassword } = body
+    const { name, email, password, confirmPassword, phone, location } = body
 
-    console.log('Registration attempt:', { name, email })
+    console.log('?? Registration attempt:', { name, email })
 
     // Validation
     if (!name || !email || !password || !confirmPassword) {
@@ -26,24 +23,34 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = global._users.find((u: any) => u.email === email)
+    const existingUser = dbOps.findUserByEmail(email)
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
 
-    // Create user (store plain password for now - we'll add hashing later)
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Create user
     const newUser = {
       id: Date.now().toString(),
       name,
       email,
-      password, // In production, hash this!
+      password: hashedPassword,
       role: 'user',
-      createdAt: new Date().toISOString()
+      phone: phone || '',
+      location: location || ''
     }
 
-    global._users.push(newUser)
-    console.log('User registered:', email)
-    console.log('Total users:', global._users.length)
+    dbOps.createUser(newUser)
+    console.log('? User registered:', email)
+
+    // Add welcome notification
+    dbOps.addNotification(
+      Date.now().toString(),
+      newUser.id,
+      'Welcome to AgriNova! Start exploring your dashboard.'
+    )
 
     return NextResponse.json({ 
       success: true, 
