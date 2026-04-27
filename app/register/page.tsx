@@ -22,6 +22,7 @@ export default function RegisterPage() {
     setSuccess('')
     setLoading(true)
 
+    // Basic validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       setLoading(false)
@@ -47,7 +48,7 @@ export default function RegisterPage() {
         throw new Error(data.error || 'Registration failed')
       }
 
-      setSuccess('Account created! Redirecting to login...')
+      setSuccess('Account created successfully! Redirecting to login...')
       setTimeout(() => router.push('/login'), 2000)
     } catch (err: any) {
       setError(err.message)

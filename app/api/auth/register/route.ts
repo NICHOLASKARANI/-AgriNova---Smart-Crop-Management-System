@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-
-// Simple in-memory storage
-const users: any[] = []
+import { memoryStore } from '@/lib/memoryStore'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password, confirmPassword } = await request.json()
+    const body = await request.json()
+    const { name, email, password, confirmPassword } = body
 
+    console.log('?? Registration attempt:', { name, email })
+
+    // Validation
     if (!name || !email || !password || !confirmPassword) {
-      return NextResponse.json({ error: 'All fields required' }, { status: 400 })
+      return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
 
     if (password !== confirmPassword) {
@@ -21,8 +23,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = users.find(u => u.email === email)
+    const existingUser = memoryStore.findUserByEmail(email)
     if (existingUser) {
+      console.log('? User already exists:', email)
       return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
 
@@ -33,21 +36,23 @@ export async function POST(request: NextRequest) {
     const newUser = {
       id: Date.now().toString(),
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
       role: 'user',
-      createdAt: new Date()
+      createdAt: new Date().toISOString()
     }
-    users.push(newUser)
 
-    console.log('User registered:', email)
+    memoryStore.addUser(newUser)
+    console.log('? User registered successfully:', email)
+    console.log('?? Total users:', memoryStore.getAllUsers().length)
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Registration successful!' 
+      message: 'Registration successful! Please login.' 
     }, { status: 201 })
+    
   } catch (error) {
-    console.error('Register error:', error)
+    console.error('? Registration error:', error)
     return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   }
 }
