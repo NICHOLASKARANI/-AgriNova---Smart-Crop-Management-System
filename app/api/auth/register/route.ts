@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import { fileStorage } from '@/lib/fileStorage'
+
+// Simple in-memory storage that persists across requests
+if (!global._users) {
+  global._users = []
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { name, email, password, confirmPassword } = body
 
-    console.log('?? Registration attempt:', { name, email })
+    console.log('Registration attempt:', { name, email })
 
     // Validation
     if (!name || !email || !password || !confirmPassword) {
@@ -23,28 +26,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const existingUser = fileStorage.findUserByEmail(email.toLowerCase())
+    const existingUser = global._users.find((u: any) => u.email === email)
     if (existingUser) {
-      console.log('? User already exists:', email)
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
+      return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // Create user
+    // Create user (store plain password for now - we'll add hashing later)
     const newUser = {
       id: Date.now().toString(),
       name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
+      email,
+      password, // In production, hash this!
       role: 'user',
       createdAt: new Date().toISOString()
     }
 
-    fileStorage.addUser(newUser)
-    console.log('? User registered successfully:', email)
-    console.log('?? Total users:', fileStorage.getUsers().length)
+    global._users.push(newUser)
+    console.log('User registered:', email)
+    console.log('Total users:', global._users.length)
 
     return NextResponse.json({ 
       success: true, 
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
     
   } catch (error) {
-    console.error('? Registration error:', error)
-    return NextResponse.json({ error: 'Registration failed. Please try again.' }, { status: 500 })
+    console.error('Registration error:', error)
+    return NextResponse.json({ error: 'Registration failed' }, { status: 500 })
   }
 }

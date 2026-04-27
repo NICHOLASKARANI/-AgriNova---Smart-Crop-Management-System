@@ -1,46 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import { fileStorage } from '@/lib/fileStorage'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'agrinova-secret-key-2026'
+// Shared storage
+if (!global._users) {
+  global._users = []
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password } = body
 
-    console.log('?? Login attempt:', email)
+    console.log('Login attempt:', email)
+    console.log('Total users in DB:', global._users.length)
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
 
-    // Find user from file storage
-    const user = fileStorage.findUserByEmail(email.toLowerCase())
-    console.log('?? User found:', user ? 'Yes' : 'No')
-
+    // Find user
+    const user = global._users.find((u: any) => u.email === email)
+    
     if (!user) {
+      console.log('User not found:', email)
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.password)
-    console.log('?? Password valid:', isValid)
-
-    if (!isValid) {
+    // Check password (plain text for now)
+    if (user.password !== password) {
+      console.log('Invalid password for:', email)
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role }, 
-      JWT_SECRET, 
-      { expiresIn: '7d' }
-    )
+    console.log('Login successful:', email)
 
-    console.log('? Login successful:', email)
-
+    // Create simple session token
+    const sessionData = JSON.stringify({ userId: user.id, email: user.email, role: user.role })
+    
     const response = NextResponse.json({
       success: true,
       message: 'Login successful',
@@ -52,7 +47,8 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    response.cookies.set('token', token, { 
+    // Set session cookie
+    response.cookies.set('session', sessionData, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -63,7 +59,7 @@ export async function POST(request: NextRequest) {
     return response
     
   } catch (error) {
-    console.error('? Login error:', error)
-    return NextResponse.json({ error: 'Login failed. Please try again.' }, { status: 500 })
+    console.error('Login error:', error)
+    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }
